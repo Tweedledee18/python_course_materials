@@ -1,0 +1,818 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 97,
+   "metadata": {
+    "id": "ugE0wOwTCWla"
+   },
+   "outputs": [],
+   "source": [
+    "%matplotlib inline\n",
+    "import requests\n",
+    "from bs4 import BeautifulSoup\n",
+    "import os\n",
+    "import pandas as pd\n",
+    "import time\n",
+    "import re\n",
+    "import seaborn\n",
+    "from lxml import html\n",
+    "import matplotlib\n",
+    "from collections import Counter\n",
+    "\n",
+    "%config InlineBackend.figure_format = 'svg'\n",
+    "from pylab import rcParams\n",
+    "rcParams['figure.figsize'] = 8, 5"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "OGxypew7WfF9"
+   },
+   "source": [
+    "Получаем 250 самых топовых фильмов"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {
+    "id": "3pyngaW9JF2q"
+   },
+   "outputs": [],
+   "source": [
+    "url = 'http://www.imdb.com/chart/top'\n",
+    "response = requests.get(url)\n",
+    "soup = BeautifulSoup(response.text, 'lxml')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "5XSedO8AWs8T"
+   },
+   "source": [
+    "Парсим страницу с фильмами и получаем грязные данные с\n",
+    "\n",
+    "\n",
+    "1.   Названием фильма\n",
+    "2.   Рейтингом\n",
+    "3.   Командой \n",
+    "4.   Ссылкой на основную страницу\n",
+    "\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {
+    "id": "WbiBk8rKNfWe"
+   },
+   "outputs": [],
+   "source": [
+    "movies = soup.select('td.titleColumn')\n",
+    "links = [a.attrs.get('href') for a in soup.select('td.titleColumn a')]\n",
+    "crew = [a.attrs.get('title') for a in soup.select('td.titleColumn a')]\n",
+    "ratings = [b.attrs.get('data-value') for b in soup.select('td.posterColumn span[name=ir]')]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {
+    "colab": {
+     "base_uri": "https://localhost:8080/",
+     "height": 423
+    },
+    "id": "g7yNtxcRR03X",
+    "outputId": "fd379955-bca1-43f7-aac8-a6a688a4cd5f"
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>movies</th>\n",
+       "      <th>ratings</th>\n",
+       "      <th>crew</th>\n",
+       "      <th>links</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>[\\n      1.\\n      , [Побег из Шоушенка], \\n, ...</td>\n",
+       "      <td>9.235271581193354</td>\n",
+       "      <td>Frank Darabont (dir.), Tim Robbins, Morgan Fre...</td>\n",
+       "      <td>/title/tt0111161/</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>[\\n      2.\\n      , [Крёстный отец], \\n, [(19...</td>\n",
+       "      <td>9.156139045326704</td>\n",
+       "      <td>Francis Ford Coppola (dir.), Marlon Brando, Al...</td>\n",
+       "      <td>/title/tt0068646/</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>[\\n      3.\\n      , [Темный рыцарь], \\n, [(20...</td>\n",
+       "      <td>8.989457879474534</td>\n",
+       "      <td>Christopher Nolan (dir.), Christian Bale, Heat...</td>\n",
+       "      <td>/title/tt0468569/</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>[\\n      4.\\n      , [Крёстный отец 2], \\n, [(...</td>\n",
+       "      <td>8.984065400079775</td>\n",
+       "      <td>Francis Ford Coppola (dir.), Al Pacino, Robert...</td>\n",
+       "      <td>/title/tt0071562/</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>[\\n      5.\\n      , [12 рaзгневанных мужчин],...</td>\n",
+       "      <td>8.950988143342077</td>\n",
+       "      <td>Sidney Lumet (dir.), Henry Fonda, Lee J. Cobb</td>\n",
+       "      <td>/title/tt0050083/</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>...</th>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>245</th>\n",
+       "      <td>[\\n      246.\\n      , [Дерсу Узала], \\n, [(19...</td>\n",
+       "      <td>8.007484857552543</td>\n",
+       "      <td>Akira Kurosawa (dir.), Maksim Munzuk, Yuriy So...</td>\n",
+       "      <td>/title/tt0071411/</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>246</th>\n",
+       "      <td>[\\n      247.\\n      , [Аладдин], \\n, [(1992)]...</td>\n",
+       "      <td>8.005221640574035</td>\n",
+       "      <td>Ron Clements (dir.), Scott Weinger, Robin Will...</td>\n",
+       "      <td>/title/tt0103639/</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>247</th>\n",
+       "      <td>[\\n      248.\\n      , [Стальной гигант], \\n, ...</td>\n",
+       "      <td>8.005204055651513</td>\n",
+       "      <td>Brad Bird (dir.), Eli Marienthal, Harry Connic...</td>\n",
+       "      <td>/title/tt0129167/</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>248</th>\n",
+       "      <td>[\\n      249.\\n      , [Прислуга], \\n, [(2011)...</td>\n",
+       "      <td>8.005080564481146</td>\n",
+       "      <td>Tate Taylor (dir.), Viola Davis, Emma Stone</td>\n",
+       "      <td>/title/tt1454029/</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>249</th>\n",
+       "      <td>[\\n      250.\\n      , [Ганди], \\n, [(1982)], \\n]</td>\n",
+       "      <td>8.004191277338707</td>\n",
+       "      <td>Richard Attenborough (dir.), Ben Kingsley, Joh...</td>\n",
+       "      <td>/title/tt0083987/</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>250 rows × 4 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "                                                movies            ratings  \\\n",
+       "0    [\\n      1.\\n      , [Побег из Шоушенка], \\n, ...  9.235271581193354   \n",
+       "1    [\\n      2.\\n      , [Крёстный отец], \\n, [(19...  9.156139045326704   \n",
+       "2    [\\n      3.\\n      , [Темный рыцарь], \\n, [(20...  8.989457879474534   \n",
+       "3    [\\n      4.\\n      , [Крёстный отец 2], \\n, [(...  8.984065400079775   \n",
+       "4    [\\n      5.\\n      , [12 рaзгневанных мужчин],...  8.950988143342077   \n",
+       "..                                                 ...                ...   \n",
+       "245  [\\n      246.\\n      , [Дерсу Узала], \\n, [(19...  8.007484857552543   \n",
+       "246  [\\n      247.\\n      , [Аладдин], \\n, [(1992)]...  8.005221640574035   \n",
+       "247  [\\n      248.\\n      , [Стальной гигант], \\n, ...  8.005204055651513   \n",
+       "248  [\\n      249.\\n      , [Прислуга], \\n, [(2011)...  8.005080564481146   \n",
+       "249  [\\n      250.\\n      , [Ганди], \\n, [(1982)], \\n]  8.004191277338707   \n",
+       "\n",
+       "                                                  crew              links  \n",
+       "0    Frank Darabont (dir.), Tim Robbins, Morgan Fre...  /title/tt0111161/  \n",
+       "1    Francis Ford Coppola (dir.), Marlon Brando, Al...  /title/tt0068646/  \n",
+       "2    Christopher Nolan (dir.), Christian Bale, Heat...  /title/tt0468569/  \n",
+       "3    Francis Ford Coppola (dir.), Al Pacino, Robert...  /title/tt0071562/  \n",
+       "4        Sidney Lumet (dir.), Henry Fonda, Lee J. Cobb  /title/tt0050083/  \n",
+       "..                                                 ...                ...  \n",
+       "245  Akira Kurosawa (dir.), Maksim Munzuk, Yuriy So...  /title/tt0071411/  \n",
+       "246  Ron Clements (dir.), Scott Weinger, Robin Will...  /title/tt0103639/  \n",
+       "247  Brad Bird (dir.), Eli Marienthal, Harry Connic...  /title/tt0129167/  \n",
+       "248        Tate Taylor (dir.), Viola Davis, Emma Stone  /title/tt1454029/  \n",
+       "249  Richard Attenborough (dir.), Ben Kingsley, Joh...  /title/tt0083987/  \n",
+       "\n",
+       "[250 rows x 4 columns]"
+      ]
+     },
+     "execution_count": 7,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "data_frame = {\n",
+    "    \"movies\": movies,\n",
+    "    \"ratings\": ratings,\n",
+    "    \"crew\": crew,\n",
+    "    \"links\": links\n",
+    "}\n",
+    "\n",
+    "data = pd.DataFrame(data_frame)\n",
+    "data"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "jvgoaN4eXGw2"
+   },
+   "source": [
+    "Несколько функциий для преобзразования грязных заголовков с названием фильмов\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {
+    "id": "1ydY8dcmSJoo"
+   },
+   "outputs": [],
+   "source": [
+    "def process_text_mv(text):\n",
+    "    data = text.get_text().split(\"\\n\")\n",
+    "    return data[2].strip()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {
+    "id": "DOUhCHOSUyWj"
+   },
+   "outputs": [],
+   "source": [
+    "def process_text_year(text):\n",
+    "    data = text.get_text().split(\"\\n\")\n",
+    "    return data[3].strip()[1:-1]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {
+    "id": "83EXl09PU67J"
+   },
+   "outputs": [],
+   "source": [
+    "data[\"title\"] = data.movies.apply(process_text_mv)\n",
+    "data[\"year\"] = data.movies.apply(process_text_year)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {
+    "colab": {
+     "base_uri": "https://localhost:8080/",
+     "height": 206
+    },
+    "id": "8tg-WxG6VGde",
+    "outputId": "4619d1ed-f48b-4b82-f912-9755c952775a"
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>movies</th>\n",
+       "      <th>ratings</th>\n",
+       "      <th>crew</th>\n",
+       "      <th>links</th>\n",
+       "      <th>title</th>\n",
+       "      <th>year</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>[\\n      1.\\n      , [Побег из Шоушенка], \\n, ...</td>\n",
+       "      <td>9.235271581193354</td>\n",
+       "      <td>Frank Darabont (dir.), Tim Robbins, Morgan Fre...</td>\n",
+       "      <td>/title/tt0111161/</td>\n",
+       "      <td>Побег из Шоушенка</td>\n",
+       "      <td>1994</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>[\\n      2.\\n      , [Крёстный отец], \\n, [(19...</td>\n",
+       "      <td>9.156139045326704</td>\n",
+       "      <td>Francis Ford Coppola (dir.), Marlon Brando, Al...</td>\n",
+       "      <td>/title/tt0068646/</td>\n",
+       "      <td>Крёстный отец</td>\n",
+       "      <td>1972</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>[\\n      3.\\n      , [Темный рыцарь], \\n, [(20...</td>\n",
+       "      <td>8.989457879474534</td>\n",
+       "      <td>Christopher Nolan (dir.), Christian Bale, Heat...</td>\n",
+       "      <td>/title/tt0468569/</td>\n",
+       "      <td>Темный рыцарь</td>\n",
+       "      <td>2008</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>[\\n      4.\\n      , [Крёстный отец 2], \\n, [(...</td>\n",
+       "      <td>8.984065400079775</td>\n",
+       "      <td>Francis Ford Coppola (dir.), Al Pacino, Robert...</td>\n",
+       "      <td>/title/tt0071562/</td>\n",
+       "      <td>Крёстный отец 2</td>\n",
+       "      <td>1974</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>[\\n      5.\\n      , [12 рaзгневанных мужчин],...</td>\n",
+       "      <td>8.950988143342077</td>\n",
+       "      <td>Sidney Lumet (dir.), Henry Fonda, Lee J. Cobb</td>\n",
+       "      <td>/title/tt0050083/</td>\n",
+       "      <td>12 рaзгневанных мужчин</td>\n",
+       "      <td>1957</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "                                              movies            ratings  \\\n",
+       "0  [\\n      1.\\n      , [Побег из Шоушенка], \\n, ...  9.235271581193354   \n",
+       "1  [\\n      2.\\n      , [Крёстный отец], \\n, [(19...  9.156139045326704   \n",
+       "2  [\\n      3.\\n      , [Темный рыцарь], \\n, [(20...  8.989457879474534   \n",
+       "3  [\\n      4.\\n      , [Крёстный отец 2], \\n, [(...  8.984065400079775   \n",
+       "4  [\\n      5.\\n      , [12 рaзгневанных мужчин],...  8.950988143342077   \n",
+       "\n",
+       "                                                crew              links  \\\n",
+       "0  Frank Darabont (dir.), Tim Robbins, Morgan Fre...  /title/tt0111161/   \n",
+       "1  Francis Ford Coppola (dir.), Marlon Brando, Al...  /title/tt0068646/   \n",
+       "2  Christopher Nolan (dir.), Christian Bale, Heat...  /title/tt0468569/   \n",
+       "3  Francis Ford Coppola (dir.), Al Pacino, Robert...  /title/tt0071562/   \n",
+       "4      Sidney Lumet (dir.), Henry Fonda, Lee J. Cobb  /title/tt0050083/   \n",
+       "\n",
+       "                    title  year  \n",
+       "0       Побег из Шоушенка  1994  \n",
+       "1           Крёстный отец  1972  \n",
+       "2           Темный рыцарь  2008  \n",
+       "3         Крёстный отец 2  1974  \n",
+       "4  12 рaзгневанных мужчин  1957  "
+      ]
+     },
+     "execution_count": 11,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "data.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {
+    "colab": {
+     "base_uri": "https://localhost:8080/",
+     "height": 35
+    },
+    "id": "ci1coegXX9IM",
+    "outputId": "7ca6ea21-87b9-4362-8865-5c04f25c7819"
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'Francis Ford Coppola (dir.), Marlon Brando, Al Pacino'"
+      ]
+     },
+     "execution_count": 12,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "data.crew[1]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "3SDxPB6qX4MR"
+   },
+   "source": [
+    "Задача 1.\n",
+    "Получить список всех участников команд (убрать постфикс `(dir.)` у директоров). Найти количество уникальных имен. \n",
+    "\n",
+    "Задача 2.\n",
+    "Получить список всех директоров. Построить распределение (визуализация обязательна) и найти директора(ов), у которого(ых) больше всего фильмов в топе.\n",
+    "\n",
+    "Задача 3. Найти участника(ов) команд, у которого(ых) больше всего фильмов в топе.\n",
+    "\n",
+    "Задача 4. Построить распределение топовых фильмов по годам\n",
+    "\n",
+    "Задача 5. Построить распределение топовых фильмов рейтингу:\n",
+    "\n",
+    "\n",
+    "*   Округлить до сотых и отрисовать\n",
+    "*   Округлить до десятых и отрисовать\n",
+    "*   Округлить до целых и отрисовать\n",
+    "\n",
+    "Задача 6. Используйте ссылку `http://www.imdb.com/` и динамически добавляя ссылку на фильм из колонки `links` соберите описание фильмов. Пример поиска необходимого текст представлен ниже. Добавьте эту информацию в исходный датафрейм.\n",
+    "\n",
+    "\n",
+    "\n",
+    "\n",
+    "\n",
+    "\n",
+    "\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 103,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Всего было: 750\n",
+      "Уникальных имён: 527\n",
+      "['Tim Robbins', 'Heath Ledger', 'Lee J. Cobb', 'Liam Neeson', 'John Travolta', 'Eli Wallach', 'Robin Wright', 'Peter Jackson', 'Elijah Wood', 'Ian McKellen', 'Joseph Gordon-Levitt', 'Irvin Kershner', 'Lana Wachowski', 'Keanu Reeves', 'Laurence Fishburne', 'Ray Liotta', 'Louise Fletcher', 'Morgan Freeman', 'Donna Reed', 'Jonathan Demme', 'Fernando Meirelles', 'Alexandre Rodrigues', 'Leandro Firmino', 'Roberto Benigni', 'Nicoletta Braschi', 'Matthew McConaughey', 'Anne Hathaway', 'Frank Darabont', 'Michael Clarke Duncan', 'George Lucas', 'Robert Zemeckis', 'Michael J. Fox', 'Christopher Lloyd', 'Daveigh Chase', 'Suzanne Pleshette', 'Anthony Perkins', 'Janet Leigh', 'Adrien Brody', 'Thomas Kretschmann', 'Lee Sun-kyun']\n"
+     ]
+    }
+   ],
+   "source": [
+    "#Задача 1. Получить список всех участников команд (убрать постфикс (dir.) у директоров).\n",
+    "crew_list = data[\"crew\"].tolist()\n",
+    "crewlist_split = ', '.join(crew_list).split(\", \")\n",
+    "crewlist_corr = [w.replace(\" (dir.)\", \"\") for w in crewlist_split]\n",
+    "\n",
+    "\n",
+    "#Убираем дубликаты и ищем количество уникальных имен\n",
+    "\n",
+    "for word in list(crewlist_corr):  \n",
+    "    if crewlist_corr.count(word) > 1:\n",
+    "        crewlist_corr.remove(word)\n",
+    "\n",
+    "\n",
+    "print(\"Всего было:\",len(crewlist_split))  \n",
+    "print(\"Уникальных имён:\", len(crewlist_corr))\n",
+    "print(crewlist_corr[:40])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 88,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "['Frank Darabont',\n",
+       " 'Francis Ford Coppola',\n",
+       " 'Christopher Nolan',\n",
+       " 'Francis Ford Coppola',\n",
+       " 'Sidney Lumet',\n",
+       " 'Steven Spielberg',\n",
+       " 'Peter Jackson',\n",
+       " 'Quentin Tarantino',\n",
+       " 'Peter Jackson',\n",
+       " 'Sergio Leone']"
+      ]
+     },
+     "execution_count": 88,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "#Задание 2. Получить список всех директоров.\n",
+    "patt = re.compile(\".*(dir.)\")\n",
+    "directors_list = list(filter(patt.match, crewlist_split)) \n",
+    "directors = [w.replace(\" (dir.)\", \"\") for w in directors_list]\n",
+    "directors[:10]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 89,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>movies</th>\n",
+       "      <th>ratings</th>\n",
+       "      <th>crew</th>\n",
+       "      <th>links</th>\n",
+       "      <th>title</th>\n",
+       "      <th>year</th>\n",
+       "      <th>Directors</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>[\\n      1.\\n      , [Побег из Шоушенка], \\n, ...</td>\n",
+       "      <td>9.235271581193354</td>\n",
+       "      <td>Frank Darabont (dir.), Tim Robbins, Morgan Fre...</td>\n",
+       "      <td>/title/tt0111161/</td>\n",
+       "      <td>Побег из Шоушенка</td>\n",
+       "      <td>1994</td>\n",
+       "      <td>Frank Darabont</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>[\\n      2.\\n      , [Крёстный отец], \\n, [(19...</td>\n",
+       "      <td>9.156139045326704</td>\n",
+       "      <td>Francis Ford Coppola (dir.), Marlon Brando, Al...</td>\n",
+       "      <td>/title/tt0068646/</td>\n",
+       "      <td>Крёстный отец</td>\n",
+       "      <td>1972</td>\n",
+       "      <td>Francis Ford Coppola</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>[\\n      3.\\n      , [Темный рыцарь], \\n, [(20...</td>\n",
+       "      <td>8.989457879474534</td>\n",
+       "      <td>Christopher Nolan (dir.), Christian Bale, Heat...</td>\n",
+       "      <td>/title/tt0468569/</td>\n",
+       "      <td>Темный рыцарь</td>\n",
+       "      <td>2008</td>\n",
+       "      <td>Christopher Nolan</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>[\\n      4.\\n      , [Крёстный отец 2], \\n, [(...</td>\n",
+       "      <td>8.984065400079775</td>\n",
+       "      <td>Francis Ford Coppola (dir.), Al Pacino, Robert...</td>\n",
+       "      <td>/title/tt0071562/</td>\n",
+       "      <td>Крёстный отец 2</td>\n",
+       "      <td>1974</td>\n",
+       "      <td>Francis Ford Coppola</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>[\\n      5.\\n      , [12 рaзгневанных мужчин],...</td>\n",
+       "      <td>8.950988143342077</td>\n",
+       "      <td>Sidney Lumet (dir.), Henry Fonda, Lee J. Cobb</td>\n",
+       "      <td>/title/tt0050083/</td>\n",
+       "      <td>12 рaзгневанных мужчин</td>\n",
+       "      <td>1957</td>\n",
+       "      <td>Sidney Lumet</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "                                              movies            ratings  \\\n",
+       "0  [\\n      1.\\n      , [Побег из Шоушенка], \\n, ...  9.235271581193354   \n",
+       "1  [\\n      2.\\n      , [Крёстный отец], \\n, [(19...  9.156139045326704   \n",
+       "2  [\\n      3.\\n      , [Темный рыцарь], \\n, [(20...  8.989457879474534   \n",
+       "3  [\\n      4.\\n      , [Крёстный отец 2], \\n, [(...  8.984065400079775   \n",
+       "4  [\\n      5.\\n      , [12 рaзгневанных мужчин],...  8.950988143342077   \n",
+       "\n",
+       "                                                crew              links  \\\n",
+       "0  Frank Darabont (dir.), Tim Robbins, Morgan Fre...  /title/tt0111161/   \n",
+       "1  Francis Ford Coppola (dir.), Marlon Brando, Al...  /title/tt0068646/   \n",
+       "2  Christopher Nolan (dir.), Christian Bale, Heat...  /title/tt0468569/   \n",
+       "3  Francis Ford Coppola (dir.), Al Pacino, Robert...  /title/tt0071562/   \n",
+       "4      Sidney Lumet (dir.), Henry Fonda, Lee J. Cobb  /title/tt0050083/   \n",
+       "\n",
+       "                    title  year             Directors  \n",
+       "0       Побег из Шоушенка  1994        Frank Darabont  \n",
+       "1           Крёстный отец  1972  Francis Ford Coppola  \n",
+       "2           Темный рыцарь  2008     Christopher Nolan  \n",
+       "3         Крёстный отец 2  1974  Francis Ford Coppola  \n",
+       "4  12 рaзгневанных мужчин  1957          Sidney Lumet  "
+      ]
+     },
+     "execution_count": 89,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "data['Directors'] = directors\n",
+    "data.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 95,
+   "metadata": {
+    "scrolled": true
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[('Christopher Nolan', 7),\n",
+       " ('Steven Spielberg', 7),\n",
+       " ('Martin Scorsese', 7),\n",
+       " ('Akira Kurosawa', 7),\n",
+       " ('Stanley Kubrick', 7),\n",
+       " ('Alfred Hitchcock', 6),\n",
+       " ('Quentin Tarantino', 5),\n",
+       " ('Charles Chaplin', 5),\n",
+       " ('Billy Wilder', 5),\n",
+       " ('Sergio Leone', 4)]"
+      ]
+     },
+     "execution_count": 95,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "#у кого больше всего фильмов в топе\n",
+    "top_list = Counter(directors).most_common(10)\n",
+    "top_list"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 36,
+   "metadata": {
+    "id": "Asma1sBASWMl"
+   },
+   "outputs": [],
+   "source": [
+    " film_url = 'http://www.imdb.com/title/tt0068646/'\n",
+    " html_text = requests.get(film_url).text"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "colab": {
+     "base_uri": "https://localhost:8080/",
+     "height": 53
+    },
+    "id": "V_aePilOcs9t",
+    "outputId": "c30ee6be-640c-41dd-c39c-cfea78a4e928"
+   },
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.google.colaboratory.intrinsic+json": {
+       "type": "string"
+      },
+      "text/plain": [
+       "'The Godfather: Directed by Francis Ford Coppola. With Marlon Brando, Al Pacino, James Caan, Richard S. Castellano. The aging patriarch of an organized crime dynasty in postwar New York City transfers control of his clandestine empire to his reluctant youngest son.'"
+      ]
+     },
+     "execution_count": 116,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "soup = BeautifulSoup(html_text, 'lxml')\n",
+    "soup.find_all(attrs={\"name\": \"description\"})[0].get(\"content\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "LuFRlSv1lLe2"
+   },
+   "source": [
+    "\n",
+    "Задача 7. С помощью регулярных выражений найдите в текстах описания фильмов имена актеров, если это возможно (то есть - они там упоминаются). Добавьте эту информацию в датафрейм и посчитайте, для скольких фильмов получилось это сдлеать. Подсказка: перечисление актеров иногда начинается с with. \n",
+    "\n",
+    "\n",
+    "Задача 8. Распарсите исходную страницу с топ-250 фильмов и получите для каждого фильмов количество оценок. Пример текста в исходной странице:`9.2 based on 2,554,919 user ratings`. Из этого текста нужно достать = `2,554,919`. Подсказка: используя метод `find_all` с аргументом `attrs` в который нужно передать `{'class': 'ratingColumn imdbRating'}` от страници `http://www.imdb.com/chart/top`. Найдите 10 фильмов (вывести их название и кол-во оценок) у которых, самое большое количество оценок.\n",
+    "\n",
+    "\n",
+    "Задача 9. Постройте топ 10 слов, которые встречаются \n",
+    "\n",
+    "1.   в названии фильмов\n",
+    "2.   в описании фильмов\n",
+    "3.   в названии и в описании фильмов\n",
+    "\n",
+    "\n",
+    "Задача 10*. Спарсить теги фильмов со страницы каждого фильма, так например для `The Godfather` ожидается получить список из `Crime, Drama`. (Можно увидеть эти теги по картинкой к фильму)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "id": "L_20GyCBlMQ-"
+   },
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "colab": {
+   "provenance": []
+  },
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.9.12"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 1
+}
